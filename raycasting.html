@@ -1,0 +1,245 @@
+<body style="margin:0; ">
+<canvas id="canvas" style="background-color: #990000; "></canvas>
+<script>
+
+class Vector
+{
+	constructor(x, y)
+	{
+		this.x = x;
+		this.y = y;
+	}
+}
+class Slider
+{
+	constructor(textPos, linePos, knobPos, title, startValue, min, max)
+    {
+        this.textPos = textPos;
+        this.linePos = linePos;
+        this.lineLength = 200;
+        this.knobPos = knobPos;
+        this.knobPos.x = startValue / max * this.lineLength;
+        this.knobSize = 10;
+        this.title = title;
+		this.min = 0;
+        this.max = max;
+        this.value = startValue;
+		this.held = false;
+	}
+    
+	changeValue(e)
+	{
+        if (e.x > this.linePos.x + this.lineLength) {
+            this.knobPos.x = this.linePos.x + this.lineLength;
+            this.value = this.max;
+        }
+        else if (e.x < this.linePos.x) {
+            this.knobPos.x = this.linePos.x;
+            this.value = this.min;
+        }
+        else {
+            this.knobPos.x = e.x;
+            this.value = (e.x - this.linePos.x) / this.lineLength * this.max;
+        }
+
+        switch (this.title)
+        {
+            case "fov":
+                fov = this.value;
+                break;
+            case "rays":
+                numOfRays = this.value;
+                break;
+            case "framerate":
+                framerate = this.value;
+                clearInterval(timer);
+                timer = setInterval(update, 1000 / framerate);
+                break;
+            case "samplingRate":
+                samplingRate = this.value;
+                break;
+        }
+	}
+}
+
+class Player
+{
+	constructor()
+	{
+		this.x = 1;
+		this.y = 1;
+		this.angle = 90; // Degrees
+		this.speed = 0.05;
+	}
+			
+	moveAtAngle(directionAngle)
+	{
+		// Save current position
+		var prevPos = new Vector(this.x, this.y);
+		// Current angle plus directionAngle in radians
+		var finalAngle = (directionAngle + this.angle) / 180 * Math.PI;
+		// Get unit vector of finalAngle
+		var unitVector = new Vector(Math.cos(finalAngle), Math.sin(finalAngle));
+		this.x += unitVector.x * this.speed;
+		this.y += unitVector.y * this.speed;
+		// Collision check
+		if (map[Math.floor(this.y)][Math.floor(this.x)] == 1)
+		{
+			this.x = prevPos.x;
+			this.y = prevPos.y;
+		}
+	}
+}
+		
+var player = new Player();
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+var fov = 45;
+var numOfRays = canvas.clientWidth;
+var framerate = 60;
+var samplingRate = 0.03;
+                         //textPos,           linePos,             knobPos,                       title,          startValue,   min,  max,
+var sliders = [ new Slider(new Vector(0, 10),  new Vector(0, 20),  new Vector(0, 15),           "fov",          fov,          0,    720 ),
+                new Slider(new Vector(0, 40),  new Vector(0, 50),  new Vector(0, 45),     "rays",         numOfRays,    0,    3000 ),
+                new Slider(new Vector(0, 70),  new Vector(0, 80),  new Vector(0, 75),     "framerate",    framerate,    0,    1000 ),
+                new Slider(new Vector(0, 100), new Vector(0, 110), new Vector(0, 105), "samplingRate", samplingRate, 0.03, 8 ),      ];
+var ctx = canvas.getContext("2d");
+var HUD = false;
+var drawDistance = 8;
+onkeydown = onkeyup = controls;
+var keyArray = new Array(68);
+keyArray.fill(false, 0);
+onmousedown = mousedown;
+onmouseup = mouseup;
+onmousemove = mousemove;
+		
+var map = [ // y:15 x:12
+[1,1,1,1,1,1,1,1,1,1,1,1],
+[1,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,0,0,0,1,1,0,0,0,0,1],
+[1,0,0,0,0,1,1,0,0,0,0,1],
+[1,0,0,0,0,1,1,0,0,0,0,1],
+[1,0,1,1,0,1,1,0,1,1,0,1],
+[1,0,0,0,0,1,1,0,0,0,0,1],
+[1,0,0,0,0,1,1,0,0,0,0,1],
+[1,0,0,0,0,1,1,0,0,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,1],
+[1,1,1,1,1,1,1,1,1,1,1,1],
+];
+		
+var timer = setInterval(update, 1000/framerate);
+function update()
+{			
+	ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+			
+	// Execute movements
+	if (keyArray[38] == "keydown")
+		player.moveAtAngle(0);
+	if (keyArray[39] == "keydown")
+		player.moveAtAngle(90);
+	if (keyArray[40] == "keydown")
+		player.moveAtAngle(180);
+	if (keyArray[37] == "keydown")
+		player.moveAtAngle(-90);
+	if (keyArray[68] == "keydown")
+		player.angle += (fov/45) * 1.0;
+	if (keyArray[65] == "keydown")
+		player.angle -= (fov/45) * 1.0;
+			
+	// Rays
+	for (var ray = 0; ray < numOfRays; ray++)
+	{
+		var rayAngle = (player.angle - fov/2 +  ray * fov/numOfRays) / 180 * Math.PI; // Radians
+		// Unit vector relative to player
+		var rayVector = new Vector(Math.cos(rayAngle), Math.sin(rayAngle));
+		// Advance the ray
+		var distanceFactor = 0.01;
+		while (true)
+		{
+			var advancedRayVector = new Vector(rayVector.x * distanceFactor, rayVector.y * distanceFactor);
+            var wallCoords = { x: player.x + advancedRayVector.x, y: player.y + advancedRayVector.y };
+            if (Math.floor(wallCoords.y) >= map.length || Math.floor(wallCoords.x) >= map[0].length)
+                break; // out of bounds wallCoords, happens when playing with sampleRate
+			if (map[Math.floor(wallCoords.y)][Math.floor(wallCoords.x)] == 1) // Hit wall?
+			{
+				// Draw wall
+				var minHeight = canvas.clientHeight/4;
+				var maxHeight = canvas.clientHeight;
+                var wallHeight = maxHeight - (maxHeight - minHeight) * (distanceFactor / drawDistance);
+				var minBlack = parseInt(canvas.style.backgroundColor.substr(4, canvas.style.backgroundColor.indexOf(",") - 4));
+				var black = minBlack * (distanceFactor/drawDistance);
+				var blackHex = Math.round(black).toString(16);
+				if (blackHex.length == 1) // Prevent fff
+					blackHex = "0" + blackHex;
+				ctx.fillStyle = "#" + blackHex + "0000";
+                ctx.fillRect(ray * canvas.clientWidth / numOfRays, Math.round(canvas.clientHeight / 2.0 - wallHeight / 2.0), canvas.clientWidth / numOfRays, wallHeight);
+                var test = canvas.clientWidth / numOfRays;
+                ctx.fillStyle = "#000";
+						
+				break; // Next ray
+			}
+					
+			distanceFactor += samplingRate;
+			if (distanceFactor > drawDistance)
+				break; // Next ray
+		}
+	}
+			
+	// Draw HUD
+	if (HUD)
+	{
+		sliders.forEach(function(slider, i)
+		{
+            ctx.fillText(slider.title + ": " + slider.value, slider.textPos.x, slider.textPos.y); // Text
+            ctx.fillRect(slider.linePos.x, slider.linePos.y, slider.lineLength, 3); // Line
+			ctx.fillRect(slider.knobPos.x, slider.knobPos.y, slider.knobSize, slider.knobSize); // Knob
+		});
+	}
+}
+		
+// Movement
+function controls(e)
+{
+	keyArray[e.keyCode] = e.type;
+	if (e.keyCode == 27 && e.type == "keyup")
+		HUD = HUD == false ? true:false;
+}
+// slider events
+function mousedown(e)
+{
+    sliders.forEach(
+        function (slider, index)
+        {
+            if (e.x >= slider.knobPos.x && e.x < slider.knobPos.x + slider.knobSize &&
+                e.y >= slider.knobPos.y && e.y < slider.knobPos.y + slider.knobSize)
+                slider.held = true;
+        }
+    );
+}
+function mouseup(e)
+{
+    sliders.forEach(
+        function (slider)
+        {
+            slider.held = false;
+        }
+    );
+}
+function mousemove(e)
+{
+    sliders.forEach(
+        function (slider)
+        {
+            if (slider.held)
+                slider.changeValue(e);
+        }
+    );
+}
+
+</script>
+</body>
